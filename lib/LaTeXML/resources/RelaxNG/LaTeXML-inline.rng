@@ -1,18 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  /=====================================================================\ 
+<!-- /=====================================================================\ 
   |  LaTeXML-inline.rnc                                                 |
-  | RelaxNG model for LaTeXML generated documents                       |
-  |=====================================================================|
+  | RelaxNG model for LaTeXML generated documents                       | |=====================================================================|
   | Part of LaTeXML:                                                    |
   |  Public domain software, produced as part of work done by the       |
-  |  United States Government & not subject to copyright in the US.     |
-  |=====================================================================|
+  |  United States Government & not subject to copyright in the US.     | |=====================================================================|
   | Bruce Miller <bruce.miller@nist.gov>                        #_#     |
-  | http://dlmf.nist.gov/LaTeXML/                              (o o)    |
-  \=========================================================ooo==U==ooo=/
+  | http://dlmf.nist.gov/LaTeXML/                              (o o)    | \=========================================================ooo==U==ooo=/
 -->
-<grammar ns="http://dlmf.nist.gov/LaTeXML" xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0" xmlns="http://relaxng.org/ns/structure/1.0">
+<grammar ns="http://dlmf.nist.gov/LaTeXML"
+  xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0"
+  xmlns="http://relaxng.org/ns/structure/1.0">
   <define name="Inline.class" combine="choice">
     <a:documentation>The inline module defines basic inline elements used throughout.</a:documentation>
     <choice>
@@ -227,6 +225,7 @@ Typically filled in by postprocessor.</a:documentation>
   <define name="anchor_attributes">
     <a:documentation>Attributes for \elementref{anchor}.</a:documentation>
     <ref name="Common.attributes"/>
+    <ref name="Labelled.attributes"/>
     <ref name="ID.attributes"/>
   </define>
   <define name="anchor_model">

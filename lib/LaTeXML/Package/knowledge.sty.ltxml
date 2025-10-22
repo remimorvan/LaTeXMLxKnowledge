@@ -19,6 +19,16 @@ DefConstructor('\kl[]{}',
     mode=>'text',
     properties=> sub {
       (kl => ($_[1] ? $_[1] : $_[2]))
-}); 
+});
+
+# There was no reasonable element for \intro that supported the attribute labels, so we added
+# this attribute to the anchor element.
+# https://math.nist.gov/~BMiller/LaTeXML/manual/schema/LaTeXML-common/#I1.ix14.I14.ix2.p1
+DefConstructor('\intro[]{}',
+    "<ltx:anchor class='klintro' labels='KL:#kl'>#2</ltx:anchor>",
+    mode=>'text',
+    properties=> sub {
+      (kl => ($_[1] ? $_[1] : $_[2]))
+});
 
 1; 
