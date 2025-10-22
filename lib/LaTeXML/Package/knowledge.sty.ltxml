@@ -15,7 +15,7 @@ use warnings;
 use LaTeXML::Package;
 
 DefConstructor('\kl[]{}',
-    "<ltx:ref labelref='KL:#kl'>#2</ltx:ref>",
+    "<ltx:klref kl='#kl'>#2</ltx:klref>",
     mode=>'text',
     properties=> sub {
       (kl => ($_[1] ? $_[1] : $_[2]))
