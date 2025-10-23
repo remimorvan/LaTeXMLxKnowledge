@@ -21,14 +21,28 @@ DefConstructor('\kl[]{}',
       (kl => ($_[1] ? $_[1] : $_[2]))
 });
 
-# There was no reasonable element for \intro that supported the attribute labels, so we added
-# this attribute to the anchor element.
+# There was no reasonable element for \intro that supported the attribute labels,
+# so we added this attribute to the anchor element.
 # https://math.nist.gov/~BMiller/LaTeXML/manual/schema/LaTeXML-common/#I1.ix14.I14.ix2.p1
 DefConstructor('\intro[]{}',
     "<ltx:anchor class='klintro' labels='KL:#kl'>#2</ltx:anchor>",
     mode=>'text',
     properties=> sub {
       (kl => ($_[1] ? $_[1] : $_[2]))
+});
+
+DefConstructor('\knowledge{}{}',
+  "<ltx:rdf about='#1' resource='#target' property='KL:#prop'/>",
+  mode=>'text',
+  properties=> sub {
+    my $directive = $_[2];
+    if ($directive->toString() =~ /^(.+)=(.+)$/) {
+      # If the directive contains '=', as in 'link=monoid',
+      # then we split the property (LHS) from the target (RHS).
+      return (prop => $1, target => $2);
+    } else {
+      return (prop => $directive);
+    }
 });
 
 1; 
