@@ -54,7 +54,7 @@ DefPrimitive('\lxRDFaPrefix{}{}', sub {
 #   it actually sets the aboutlabelref or aboutidref attribute (resp).
 #   These will be resolved back to a IRI for about during postprocessing.
 #   Note, however, that otherwise, the about need not be an explicit reference
-#   to a part of the document; it can be 'vitual'.
+#   to a part of the document; it can be 'virtual'.
 DefKeyVal('RDFa', about => 'Semiverbatim');
 #======================================================================
 # resource: Specifies the object of the a @property on the same element,
