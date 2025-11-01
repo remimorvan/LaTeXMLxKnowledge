@@ -14,8 +14,62 @@ use strict;
 use warnings;
 use LaTeXML::Package;
 
+# ---
+# Defines functions to handle all knowledges
+# ---
+sub breakupDirectives {
+	my ($directives) = @_;
+	# $directives is a string, containing a list of directives
+	# of the form `key=value` (e.g. `url="https://wikipedia.org"`)
+	# or of the form `key` (e.g. `notion`, `synonym`).
+	# We breakit up into a hashable.
+	my %directivesHash;
+	foreach my $dir (split(",", $directives)) {
+		if ($dir =~ /^(.*)=(.*)$/) {
+			$directivesHash{$1} = $2;
+		} else {
+      $directivesHash{$dir} = 1;
+    }
+	}
+	return \%directivesHash;
+}
+
+sub getDirective {
+  # Checks if the a directive was given for a knowledge.
+  # Returns either a boolean or a value (e.g. for `url`).
+  my ($kl, $dir) = @_;
+  if (defined LookupMapping("KL:knowledges", $kl)->{$dir}) {
+    return LookupMapping("KL:knowledges", $kl)->{$dir};
+  }
+  return 0; 
+}
+
+sub yieldsInternalHyperlink {
+  my ($kl) = @_;
+  return getDirective($kl, "notion") || getDirective($kl, "link");
+}
+
+sub getRoot {
+  # Given a knowledge that produces an internal hyperlink, get
+  # its root knowledge.
+  my ($kl) = @_;
+  if (getDirective($kl, "notion")) {
+    return $kl;
+  }
+  my $parent = getDirective($kl, "link");
+  return getRoot($parent);
+}
+
+# Store the directives in a global dict 'KL:knowledges'
+DefPrimitive('\knowledge{}{}',
+  sub {
+    my ($stomach, $source, $directives) = @_;
+    AssignMapping('KL:knowledges', $source->toString(), breakupDirectives($directives->toString()));
+    return undef;
+});
+
 DefConstructor('\kl[]{}',
-    "<ltx:ref class='kl' labelref='KL:#kl'>#2</ltx:ref>",
+    "<ltx:ref class='kl' labelref='KLTEMP:#kl'>#2</ltx:ref>",
     mode=>'text',
     properties=> sub {
       (kl => ($_[1] ? $_[1] : $_[2]))
@@ -25,24 +79,38 @@ DefConstructor('\kl[]{}',
 # so we added this attribute to the anchor element.
 # https://math.nist.gov/~BMiller/LaTeXML/manual/schema/LaTeXML-common/#I1.ix14.I14.ix2.p1
 DefConstructor('\intro[]{}',
-    "<ltx:anchor class='klintro' labels='KL:#kl'>#2</ltx:anchor>",
+    "<ltx:anchor class='klintro' labels='KLTEMP:#kl'>#2</ltx:anchor>",
     mode=>'text',
     properties=> sub {
       (kl => ($_[1] ? $_[1] : $_[2]))
 });
 
-DefConstructor('\knowledge{}{}',
-  "<ltx:rdf about='#1' resource='#target' property='KL:#prop'/>",
-  mode=>'text',
-  properties=> sub {
-    my $directive = $_[2];
-    if ($directive->toString() =~ /^(.+)=(.+)$/) {
-      # If the directive contains '=', as in 'link=monoid',
-      # then we split the property (LHS) from the target (RHS).
-      return (prop => $1, target => $2);
-    } else {
-      return (prop => $directive);
+DefRewrite(
+  xpath => "descendant-or-self::ltx:ref",
+  replace => sub {
+    my ($doc, $ref) = @_;
+    my $labelref = $ref->getAttribute("labelref");
+    if ($labelref =~ /^KLTEMP:(.*)$/) {
+      print "\n Rewriting: klref -> ", $1;
+      print "\n\t Parent: ", getRoot($1);
     }
-});
+  }
+);
+
+# print "\n[KL]", LookupMapping('KL:knowledges', 'groups'), "\n";
+
+# DefConstructor('\knowledge{}{}',
+#   "<ltx:rdf about='#1' resource='#target' property='KL:#prop'/>",
+#   mode=>'text',
+#   properties=> sub {
+#     print @knowledges, "\n";
+#     my $directive = $_[2];
+#     if ($directive->toString() =~ /^(.+)=(.+)$/) {
+#       # If the directive contains '=', as in 'link=monoid',
+#       # then we split the property (LHS) from the target (RHS).
+#       return (prop => $1, target => $2);
+#     }
+#     return (prop => $directive);
+# });
 
 1; 
