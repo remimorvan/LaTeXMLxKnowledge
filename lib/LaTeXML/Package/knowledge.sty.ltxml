@@ -49,7 +49,7 @@ sub yieldsInternalHyperlink {
   return getDirective($kl, "notion") || getDirective($kl, "link");
 }
 
-sub getRoot {
+sub getRootNotion {
   # Given a knowledge that produces an internal hyperlink, get
   # its root knowledge.
   my ($kl) = @_;
@@ -57,7 +57,7 @@ sub getRoot {
     return $kl;
   }
   my $parent = getDirective($kl, "link");
-  return getRoot($parent);
+  return getRootNotion($parent);
 }
 
 # Store the directives in a global dict 'KL:knowledges'
@@ -86,16 +86,28 @@ DefConstructor('\intro[]{}',
 });
 
 DefRewrite(
-  xpath => "descendant-or-self::ltx:ref",
-  replace => sub {
-    my ($doc, $ref) = @_;
-    my $labelref = $ref->getAttribute("labelref");
-    if ($labelref =~ /^KLTEMP:(.*)$/) {
-      print "\n Rewriting: klref -> ", $1;
-      print "\n\t Parent: ", getRoot($1);
+  select => ["descendant-or-self::ltx:anchor"],
+  match => sub {
+    my ($doc, $anchor) = @_;
+    my $label = $anchor->getAttribute("labels");
+    if ($label =~ /^KLTEMP:(.*)$/) {
+      $anchor->setAttribute("labels", "KL:" . getRootNotion($1));
     }
   }
 );
+
+DefRewrite(
+  select => ["descendant-or-self::ltx:ref"],
+  match => sub {
+    my ($doc, $ref) = @_;
+    my $label = $ref->getAttribute("labelref");
+    if ($label =~ /^KLTEMP:(.*)$/) {
+      $ref->setAttribute("labelref", "KL:" . getRootNotion($1));
+    }
+  }
+);
+
+
 
 # print "\n[KL]", LookupMapping('KL:knowledges', 'groups'), "\n";
 
