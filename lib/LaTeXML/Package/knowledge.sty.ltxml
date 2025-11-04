@@ -12,23 +12,53 @@
 package LaTeXML::Package::Pool;
 use strict;
 use warnings;
+use 5.010;
 use LaTeXML::Package;
+
+# ---
+# Prefix of knowledge labels used in the xml document
+# ---
+my $prefixLabel = "KL:";
+my $prefixLabelTemp = "KLTEMP:";
+
+# ---
+# Names of values/mapping used to store information obtained while scanning .tex document
+# ---
+# Hash of all directives
+my $definedDirectives = "KL:definedDirectives";
+# Name of last knowledge that was defined
+my $lastKnowledge = "KL:lastKnowledge";
 
 # ---
 # Defines functions to handle all knowledges
 # ---
+
+sub processDirectives {
+  # Given a pair (key, value) defining a new directive, updates the hashref
+  # $refDirectives accordingly.
+  my ($key, $value, $refDirectives) = @_;
+  my $processDirectives_ = {
+    synonym => sub { $refDirectives->{"link"} = LookupValue($lastKnowledge); },
+    default => sub {
+      # Remove surronding double quotes in value (if there are some)
+      $refDirectives->{$key} = ($value =~ /^"(.*)"$/) ? $1 : $value;
+    }
+  };
+  ($processDirectives_->{$key} || $processDirectives_->{"default"})->();
+}
+
 sub breakupDirectives {
-	my ($directives) = @_;
+	my ($directivesString) = @_;
 	# $directives is a string, containing a list of directives
 	# of the form `key=value` (e.g. `url="https://wikipedia.org"`)
 	# or of the form `key` (e.g. `notion`, `synonym`).
-	# We breakit up into a hashable.
+	# We break it into a hashable.
 	my %directivesHash;
-	foreach my $dir (split(",", $directives)) {
+	foreach my $dir (split(",", $directivesString)) {
 		if ($dir =~ /^(.*)=(.*)$/) {
-			$directivesHash{$1} = $2;
+      processDirectives($1, $2, \%directivesHash);
 		} else {
-      $directivesHash{$dir} = 1;
+      processDirectives($dir, 1, \%directivesHash);
     }
 	}
 	return \%directivesHash;
@@ -38,8 +68,8 @@ sub getDirective {
   # Checks if the a directive was given for a knowledge.
   # Returns either a boolean or a value (e.g. for `url`).
   my ($kl, $dir) = @_;
-  if (defined LookupMapping("KL:knowledges", $kl)->{$dir}) {
-    return LookupMapping("KL:knowledges", $kl)->{$dir};
+  if (defined LookupMapping($definedDirectives, $kl)->{$dir}) {
+    return LookupMapping($definedDirectives, $kl)->{$dir};
   }
   return 0; 
 }
@@ -60,11 +90,16 @@ sub getRootNotion {
   return getRootNotion($parent);
 }
 
-# Store the directives in a global dict 'KL:knowledges'
+# ---
+# Defines primitives and constructors
+# ---
+
+# Store the directives in a global dict called $definedDirectives
 DefPrimitive('\knowledge{}{}',
   sub {
     my ($stomach, $source, $directives) = @_;
-    AssignMapping('KL:knowledges', $source->toString(), breakupDirectives($directives->toString()));
+    AssignMapping($definedDirectives, $source->toString(), breakupDirectives($directives->toString()));
+    AssignValue($lastKnowledge, $source->toString());
     return undef;
 });
 
@@ -84,6 +119,10 @@ DefConstructor('\intro[]{}',
     properties=> sub {
       (kl => ($_[1] ? $_[1] : $_[2]))
 });
+
+# ---
+# Rewrite temporary labels by using directives definitions
+# ---
 
 DefRewrite(
   select => ["descendant-or-self::ltx:anchor"],
@@ -106,23 +145,5 @@ DefRewrite(
     }
   }
 );
-
-
-
-# print "\n[KL]", LookupMapping('KL:knowledges', 'groups'), "\n";
-
-# DefConstructor('\knowledge{}{}',
-#   "<ltx:rdf about='#1' resource='#target' property='KL:#prop'/>",
-#   mode=>'text',
-#   properties=> sub {
-#     print @knowledges, "\n";
-#     my $directive = $_[2];
-#     if ($directive->toString() =~ /^(.+)=(.+)$/) {
-#       # If the directive contains '=', as in 'link=monoid',
-#       # then we split the property (LHS) from the target (RHS).
-#       return (prop => $1, target => $2);
-#     }
-#     return (prop => $directive);
-# });
 
 1; 
