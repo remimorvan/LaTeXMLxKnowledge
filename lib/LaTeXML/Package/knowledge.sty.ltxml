@@ -146,13 +146,14 @@ sub findLastAnchor {
   my ($doc) = @_;
   state $mappingToLastAnchor = {};
   unless (%$mappingToLastAnchor) {
-    state $lastAnchor = $doc->documentElement();
+    state $lastAnchor = 0;
     sub dfs {
       my ($node) = @_;
       if (
         $node->nodeName() eq 'anchor'
         && $node->hasAttribute('class')
         && $node->getAttribute('class') eq 'klintro'
+        && $lastAnchor != 0
       ) {
         $mappingToLastAnchor->{$node} = $lastAnchor;
       } elsif (
