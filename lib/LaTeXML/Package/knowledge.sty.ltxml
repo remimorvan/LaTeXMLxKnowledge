@@ -65,11 +65,16 @@ sub breakupDirectives {
 	return \%directivesHash;
 }
 
+sub isKnowledgeDefined {
+  my ($kl) = @_;
+  return defined LookupMapping($definedDirectives, $kl);
+}
+
 sub getDirective {
   # Checks if the a directive was given for a knowledge.
   # Returns either a boolean or a value (e.g. for `url`).
   my ($kl, $dir) = @_;
-  if (defined LookupMapping($definedDirectives, $kl)->{$dir}) {
+  if (isKnowledgeDefined($kl) && defined LookupMapping($definedDirectives, $kl)->{$dir}) {
     return LookupMapping($definedDirectives, $kl)->{$dir};
   }
   return 0; 
@@ -176,20 +181,25 @@ DefRewrite(
   match => sub {
     my ($doc, $intro) = @_;
     if ($intro->getAttribute("labels") =~ /^$prefixLabelTemp(.*)$/) {
-      my $mappingToLastAnchor = findLastAnchor($doc);
-      # Move labels to the last anchor (any node with an xml:id attribute).
-      if (my $anchor = $mappingToLastAnchor->{$intro}) {
-        my $newLabel = "";
-        if ($anchor->hasAttribute("labels")) {
-          $newLabel .= $anchor->getAttribute("labels") . " ";
+      if (isKnowledgeDefined($1)) {
+        my $mappingToLastAnchor = findLastAnchor($doc);
+        # Move labels to the last anchor (any node with an xml:id attribute).
+        if (my $anchor = $mappingToLastAnchor->{$intro}) {
+          my $newLabel = "";
+          if ($anchor->hasAttribute("labels")) {
+            $newLabel .= $anchor->getAttribute("labels") . " ";
+          }
+          $newLabel .= $prefixLabel . getRootNotion($1);
+          $anchor->setAttribute("labels", $newLabel);
         }
-        $newLabel .= $prefixLabel . getRootNotion($1);
-        $anchor->setAttribute("labels", $newLabel);
       }
       # Create new text tag
       $intro->setNodeName("text");
       $intro->removeAttribute("labels");
       $intro->removeAttribute("xml:id");
+      if (!isKnowledgeDefined($1)) {
+        $intro->setAttribute('class', 'klintroundefined');
+      }
     }
   }
 );
