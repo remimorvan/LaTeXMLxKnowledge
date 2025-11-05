@@ -20,6 +20,7 @@ use feature 'state';
 # ---
 my $prefixLabel = "KL:";
 my $prefixLabelTemp = "KLTEMP:";
+my $dumbLabel = "KLUNIQUE:dumbAPlabel";
 
 # ---
 # Names of values/mapping used to store information obtained while scanning .tex document
@@ -110,8 +111,10 @@ DefConstructor('\kl[]{}',
       (kl => ($_[1] ? $_[1] : $_[2]))
 });
 
+# We add a dumb (temporary) label to the anchor to force LaTeXML
+# to assign it an xml:id. Its final labels will be defined during Rewriting.
 DefConstructor('\AP',
-    "<ltx:anchor class='klAP'/>",
+    "<ltx:anchor class='klAP' labels='$dumbLabel'/>",
     mode=>'text'
 );
 
@@ -171,11 +174,10 @@ DefRewrite(
     if ($intro->getAttribute("labels") =~ /^$prefixLabelTemp(.*)$/) {
       my $mappingToLastAnchorPoint = findLastAnchorPoints($doc);
       my $anchorPoint = $mappingToLastAnchorPoint->{$intro};
-      my $newLabel = (
-        ($anchorPoint->hasAttribute("labels"))
-        ? $anchorPoint->getAttribute("labels") . " "
-        : ""
-      ) . ($prefixLabel . getRootNotion($1));
+      my $newLabel =
+        ($anchorPoint->getAttribute("labels") . " ")
+        # AP always has an attribute labels because of the $dumbLabel.
+        . ($prefixLabel . getRootNotion($1));
       $anchorPoint->setAttribute("labels", $newLabel);
       # Create new text tag
       $intro->setNodeName("text");
@@ -183,6 +185,23 @@ DefRewrite(
       $intro->removeAttribute("xml:id");
     }
   }
+);
+
+DefRewrite(
+  xpath => "//ltx:anchor[\@class = 'klAP']",
+  match => sub {
+    my ($doc, $anchor) = @_;
+    if ($anchor->hasAttribute("labels")) {
+      # If there are no other labels, remove the node.
+      # Otherwise, only remove the temporary label.
+      if ($anchor->getAttribute("labels") eq $dumbLabel) {
+        $anchor->unbindNode();
+        # $anchor->setAttribute("labels", "");
+      } elsif ($anchor->getAttribute("labels") =~ /^$dumbLabel (.*)$/) {
+        $anchor->setAttribute("labels", $1);
+      }
+    }
+  } 
 );
 
 DefRewrite(
