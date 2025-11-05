@@ -134,7 +134,7 @@ sub findLastAnchorPoints {
   # (or rather its XML representation as an anchor tag of class klintro)
   # to the lattest preceding occurence of 
   # an \AP (represented by an anchor of class klAP), or sectionning tag.
-  # TODO: This is cached.
+  # This is cached.
   my ($doc) = @_;
   state $mappingToLastAnchorPoint = {};
   unless (%$mappingToLastAnchorPoint) {
@@ -145,6 +145,7 @@ sub findLastAnchorPoints {
         if ($node->getAttribute('class') eq 'klAP') {
           $lastAnchorPoint = $node;
         }
+        #TODO also deal with sections 
         if ($node->getAttribute('class') eq 'klintro') {
           $mappingToLastAnchorPoint->{$node} = $lastAnchorPoint;
         }
