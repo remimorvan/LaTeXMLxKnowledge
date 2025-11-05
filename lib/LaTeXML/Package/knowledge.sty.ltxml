@@ -132,26 +132,30 @@ DefConstructor('\intro[]{}',
 # Rewrite temporary labels by using directives definitions
 # ---
 
-sub findLastAnchorPoints {
+sub findLastAnchor {
   # Returns a hashref that maps any \intro
   # (or rather its XML representation as an anchor tag of class klintro)
-  # to the lattest preceding occurence of 
-  # an \AP (represented by an anchor of class klAP), or sectionning tag.
-  # This is cached.
+  # to the lattest preceding occurence of an anchor (in fact, any anchor or section node
+  # with an xml:id attribute: this includes \AP, but also sections).
+  # This is hash is cached.
   my ($doc) = @_;
-  state $mappingToLastAnchorPoint = {};
-  unless (%$mappingToLastAnchorPoint) {
-    state $lastAnchorPoint = $doc->documentElement();
+  state $mappingToLastAnchor = {};
+  unless (%$mappingToLastAnchor) {
+    state $lastAnchor = $doc->documentElement();
     sub dfs {
       my ($node) = @_;
-      if ($node->nodeName() eq 'anchor' && $node->hasAttribute('class')) {
-        if ($node->getAttribute('class') eq 'klAP') {
-          $lastAnchorPoint = $node;
-        }
-        #TODO also deal with sections 
-        if ($node->getAttribute('class') eq 'klintro') {
-          $mappingToLastAnchorPoint->{$node} = $lastAnchorPoint;
-        }
+      if (
+        $node->nodeName() eq 'anchor'
+        && $node->hasAttribute('class')
+        && $node->getAttribute('class') eq 'klintro'
+      ) {
+        $mappingToLastAnchor->{$node} = $lastAnchor;
+      } elsif (
+        ($node->nodeName() eq 'anchor'
+          || $node->nodeName() eq 'section')
+        && $node->hasAttribute('xml:id')
+      ) {
+        $lastAnchor = $node;
       }
       for my $child ($node->getChildrenByTagName('*')) {
         dfs($child);
@@ -159,7 +163,7 @@ sub findLastAnchorPoints {
     }
     dfs($doc->documentElement());
   }
-  return $mappingToLastAnchorPoint;
+  return $mappingToLastAnchor;
 }
 
 # Whenever we find an anchor tag created by an \intro
@@ -172,13 +176,16 @@ DefRewrite(
   match => sub {
     my ($doc, $intro) = @_;
     if ($intro->getAttribute("labels") =~ /^$prefixLabelTemp(.*)$/) {
-      my $mappingToLastAnchorPoint = findLastAnchorPoints($doc);
-      my $anchorPoint = $mappingToLastAnchorPoint->{$intro};
-      my $newLabel =
-        ($anchorPoint->getAttribute("labels") . " ")
-        # AP always has an attribute labels because of the $dumbLabel.
-        . ($prefixLabel . getRootNotion($1));
-      $anchorPoint->setAttribute("labels", $newLabel);
+      my $mappingToLastAnchor = findLastAnchor($doc);
+      # Move labels to the last anchor (any node with an xml:id attribute).
+      if (my $anchor = $mappingToLastAnchor->{$intro}) {
+        my $newLabel = "";
+        if ($anchor->hasAttribute("labels")) {
+          $newLabel .= $anchor->getAttribute("labels") . " ";
+        }
+        $newLabel .= $prefixLabel . getRootNotion($1);
+        $anchor->setAttribute("labels", $newLabel);
+      }
       # Create new text tag
       $intro->setNodeName("text");
       $intro->removeAttribute("labels");
