@@ -12,8 +12,8 @@
 package LaTeXML::Package::Pool;
 use strict;
 use warnings;
-use 5.010;
 use LaTeXML::Package;
+use feature 'state';
 
 # ---
 # Prefix of knowledge labels used in the xml document
@@ -104,17 +104,22 @@ DefPrimitive('\knowledge{}{}',
 });
 
 DefConstructor('\kl[]{}',
-    "<ltx:ref class='kl' labelref='KLTEMP:#kl'>#2</ltx:ref>",
+    "<ltx:ref class='kl' labelref='$prefixLabelTemp#kl'>#2</ltx:ref>",
     mode=>'text',
     properties=> sub {
       (kl => ($_[1] ? $_[1] : $_[2]))
 });
 
+DefConstructor('\AP',
+    "<ltx:anchor class='klAP'/>",
+    mode=>'text'
+);
+
 # There was no reasonable element for \intro that supported the attribute labels,
 # so we added this attribute to the anchor element.
 # https://math.nist.gov/~BMiller/LaTeXML/manual/schema/LaTeXML-common/#I1.ix14.I14.ix2.p1
 DefConstructor('\intro[]{}',
-    "<ltx:anchor class='klintro' labels='KLTEMP:#kl'>#2</ltx:anchor>",
+    "<ltx:anchor class='klintro' labels='$prefixLabelTemp#kl'>#2</ltx:anchor>",
     mode=>'text',
     properties=> sub {
       (kl => ($_[1] ? $_[1] : $_[2]))
@@ -124,24 +129,68 @@ DefConstructor('\intro[]{}',
 # Rewrite temporary labels by using directives definitions
 # ---
 
+sub findLastAnchorPoints {
+  # Returns a hashref that maps any \intro
+  # (or rather its XML representation as an anchor tag of class klintro)
+  # to the lattest preceding occurence of 
+  # an \AP (represented by an anchor of class klAP), or sectionning tag.
+  # TODO: This is cached.
+  my ($doc) = @_;
+  state $mappingToLastAnchorPoint = {};
+  unless (%$mappingToLastAnchorPoint) {
+    state $lastAnchorPoint = $doc->documentElement();
+    sub dfs {
+      my ($node) = @_;
+      if ($node->nodeName() eq 'anchor' && $node->hasAttribute('class')) {
+        if ($node->getAttribute('class') eq 'klAP') {
+          $lastAnchorPoint = $node;
+        }
+        if ($node->getAttribute('class') eq 'klintro') {
+          $mappingToLastAnchorPoint->{$node} = $lastAnchorPoint;
+        }
+      }
+      for my $child ($node->getChildrenByTagName('*')) {
+        dfs($child);
+      }
+    }
+    dfs($doc->documentElement());
+  }
+  return $mappingToLastAnchorPoint;
+}
+
+# Whenever we find an anchor tag created by an \intro
+# (i.e. of class klintro and with label(s)), we:
+# 1. Move the labels to the lattest preceding occurence of 
+#     an \AP (represented by an anchor of class klAP), or sectionning.
+# 2. Change the anchor tag into a `text` tag.
 DefRewrite(
-  select => ["descendant-or-self::ltx:anchor"],
+  xpath => "//ltx:anchor[\@class = 'klintro'][starts-with(\@labels, '$prefixLabelTemp')]",
   match => sub {
-    my ($doc, $anchor) = @_;
-    my $label = $anchor->getAttribute("labels");
-    if ($label =~ /^KLTEMP:(.*)$/) {
-      $anchor->setAttribute("labels", "KL:" . getRootNotion($1));
+    my ($doc, $intro) = @_;
+    if ($intro->getAttribute("labels") =~ /^$prefixLabelTemp(.*)$/) {
+      my $mappingToLastAnchorPoint = findLastAnchorPoints($doc);
+      my $anchorPoint = $mappingToLastAnchorPoint->{$intro};
+      my $newLabel = (
+        ($anchorPoint->hasAttribute("labels"))
+        ? $anchorPoint->getAttribute("labels") . " "
+        : ""
+      ) . ($prefixLabel . getRootNotion($1));
+      $anchorPoint->setAttribute("labels", $newLabel);
+      # Create new text tag
+      $intro->setNodeName("text");
+      $intro->removeAttribute("labels");
+      $intro->removeAttribute("xml:id");
     }
   }
 );
 
 DefRewrite(
-  select => ["descendant-or-self::ltx:ref"],
+  xpath => "//ltx:ref[\@class = 'kl'][starts-with(\@labelref, '$prefixLabelTemp')]",
   match => sub {
     my ($doc, $ref) = @_;
-    my $label = $ref->getAttribute("labelref");
-    if ($label =~ /^KLTEMP:(.*)$/) {
-      $ref->setAttribute("labelref", "KL:" . getRootNotion($1));
+    if ($ref->getAttribute("labelref") =~ /^$prefixLabelTemp(.*)$/) {
+      my $newLabel = $prefixLabel . getRootNotion($1);
+      $ref->setAttribute("labelref", $newLabel);
     }
   }
 );
