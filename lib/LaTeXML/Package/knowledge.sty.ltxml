@@ -41,8 +41,8 @@ sub processDirectives {
   my $processDirectives_ = {
     synonym => sub { $refDirectives->{"link"} = LookupValue($lastKnowledge); },
     default => sub {
-      # Remove surronding double quotes in value (if there are some)
-      $refDirectives->{$key} = ($value =~ /^"(.*)"$/) ? $1 : $value;
+      # Remove surronding double braces in value (if there are some)
+      $refDirectives->{$key} = ($value =~ /^{(.*)}$/) ? $1 : $value;
     }
   };
   ($processDirectives_->{$key} || $processDirectives_->{"default"})->();
@@ -51,7 +51,7 @@ sub processDirectives {
 sub breakupDirectives {
 	my ($directivesString) = @_;
 	# $directives is a string, containing a list of directives
-	# of the form `key=value` (e.g. `url="https://wikipedia.org"`)
+	# of the form `key=value` (e.g. `url={https://wikipedia.org}`)
 	# or of the form `key` (e.g. `notion`, `synonym`).
 	# We break it into a hashable.
 	my %directivesHash;
@@ -80,20 +80,25 @@ sub getDirective {
   return 0; 
 }
 
-sub yieldsInternalHyperlink {
-  my ($kl) = @_;
-  return getDirective($kl, "notion") || getDirective($kl, "link");
-}
-
 sub getRootNotion {
-  # Given a knowledge that produces an internal hyperlink, get
-  # its root knowledge.
+  # Given a knowledge, get its root knowledge, or 0 if it doesn't exist.
   my ($kl) = @_;
   if (getDirective($kl, "notion")) {
     return $kl;
   }
-  my $parent = getDirective($kl, "link");
-  return getRootNotion($parent);
+  if (my $parent = getDirective($kl, "link")) {
+    return getRootNotion($parent);
+  }
+  return 0;
+}
+
+sub getUrl {
+  # Given a knowledge, returns its url if it has some, and zero otherwise.
+  my ($kl) = @_;
+  if (my $url = getDirective($kl, "url")) {
+    return $url;
+  }
+  return 0;
 }
 
 # ---
@@ -222,13 +227,22 @@ DefRewrite(
   } 
 );
 
+sub rewriteKnowledge {
+  my ($ref, $kl) = @_;
+  if (my $rootkl = getRootNotion($kl)) {
+    $ref->setAttribute("labelref", $prefixLabel . $rootkl);
+  } elsif (my $url = getUrl($kl)) {
+    $ref->removeAttribute("labelref");
+    $ref->setAttribute("href", $url);
+  }
+}
+
 DefRewrite(
   xpath => "//ltx:ref[\@class = 'kl'][starts-with(\@labelref, '$prefixLabelTemp')]",
   match => sub {
     my ($doc, $ref) = @_;
     if ($ref->getAttribute("labelref") =~ /^$prefixLabelTemp(.*)$/) {
-      my $newLabel = $prefixLabel . getRootNotion($1);
-      $ref->setAttribute("labelref", $newLabel);
+      rewriteKnowledge($ref, $1);
     }
   }
 );
