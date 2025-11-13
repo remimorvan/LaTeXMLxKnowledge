@@ -114,10 +114,12 @@ DefPrimitive('\knowledge{}{}',
     return undef;
 });
 
-DefConstructor('\kl[]{}',
-    "<ltx:ref class='kl' labelref='$prefixLabelTemp#kl'>#2</ltx:ref>",
+DefConstructor('\kl OptionalBalancedParen []{}',
+    "<ltx:ref class='kl' labelref='$prefixLabelTemp#kl'>#text</ltx:ref>",
     properties=> sub {
-      (kl => ($_[1] ? $_[1] : $_[2]))
+      my ($stomach, $scope, $kl, $text) = @_;
+      $kl = ($kl ? $kl->toString() : $text->toString()) . ($scope ? '@' . $scope->toString() : '');
+      (kl => $kl, text => $text->toString())
 });
 
 # We add a dumb (temporary) label to the anchor to force LaTeXML
