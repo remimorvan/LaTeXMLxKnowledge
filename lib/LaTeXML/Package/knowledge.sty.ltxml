@@ -114,13 +114,15 @@ DefPrimitive('\knowledge{}{}',
     return undef;
 });
 
+sub parse_kl_or_intro {
+  my ($stomach, $scope, $kl, $text) = @_;
+  $kl = ($kl ? $kl->toString() : $text->toString()) . ($scope ? '@' . $scope->toString() : '');
+  (kl => $kl, text => $text->toString())
+}
+
 DefConstructor('\kl OptionalBalancedParen []{}',
     "<ltx:ref class='kl' labelref='$prefixLabelTemp#kl'>#text</ltx:ref>",
-    properties=> sub {
-      my ($stomach, $scope, $kl, $text) = @_;
-      $kl = ($kl ? $kl->toString() : $text->toString()) . ($scope ? '@' . $scope->toString() : '');
-      (kl => $kl, text => $text->toString())
-});
+    properties=> sub { parse_kl_or_intro(@_) });
 
 # We add a dumb (temporary) label to the anchor to force LaTeXML
 # to assign it an xml:id. Its final labels will be defined during Rewriting.
@@ -131,11 +133,9 @@ DefConstructor('\AP',
 # There was no reasonable element for \intro that supported the attribute labels,
 # so we added this attribute to the anchor element.
 # https://math.nist.gov/~BMiller/LaTeXML/manual/schema/LaTeXML-common/#I1.ix14.I14.ix2.p1
-DefConstructor('\intro[]{}',
-    "<ltx:anchor class='klintro' labels='$prefixLabelTemp#kl'>#2</ltx:anchor>",
-    properties=> sub {
-      (kl => ($_[1] ? $_[1] : $_[2]))
-});
+DefConstructor('\intro OptionalBalancedParen []{}',
+    "<ltx:anchor class='klintro' labels='$prefixLabelTemp#kl'>#text</ltx:anchor>",
+    properties=> sub { parse_kl_or_intro(@_) });
 
 # ---
 # Rewrite temporary labels by using directives definitions
