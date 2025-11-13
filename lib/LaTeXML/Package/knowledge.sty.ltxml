@@ -1,6 +1,6 @@
 # /=====================================================================\ #
 # |  knowledge.sty                                                      | #
-# | Implementation for LaTeXML                                          | #
+# | Implementation for LaTeXML  -  https://ctan.org/pkg/knowledge       | #
 # |=====================================================================| #
 # | Part of LaTeXML:                                                    | #
 # |  Public domain software, produced as part of work done by the       | #
@@ -116,7 +116,6 @@ DefPrimitive('\knowledge{}{}',
 
 DefConstructor('\kl[]{}',
     "<ltx:ref class='kl' labelref='$prefixLabelTemp#kl'>#2</ltx:ref>",
-    mode=>'text',
     properties=> sub {
       (kl => ($_[1] ? $_[1] : $_[2]))
 });
@@ -124,8 +123,7 @@ DefConstructor('\kl[]{}',
 # We add a dumb (temporary) label to the anchor to force LaTeXML
 # to assign it an xml:id. Its final labels will be defined during Rewriting.
 DefConstructor('\AP',
-    "<ltx:anchor class='klAP' labels='$dumbLabel'/>",
-    mode=>'text'
+    "<ltx:anchor class='klAP' labels='$dumbLabel'/>"
 );
 
 # There was no reasonable element for \intro that supported the attribute labels,
@@ -133,7 +131,6 @@ DefConstructor('\AP',
 # https://math.nist.gov/~BMiller/LaTeXML/manual/schema/LaTeXML-common/#I1.ix14.I14.ix2.p1
 DefConstructor('\intro[]{}',
     "<ltx:anchor class='klintro' labels='$prefixLabelTemp#kl'>#2</ltx:anchor>",
-    mode=>'text',
     properties=> sub {
       (kl => ($_[1] ? $_[1] : $_[2]))
 });
