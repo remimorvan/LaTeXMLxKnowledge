@@ -13,7 +13,6 @@ package LaTeXML::Package::Pool;
 use strict;
 use warnings;
 use LaTeXML::Package;
-use feature 'state';
 
 DefPrimitive('\knowledge{}{}',
   sub { my $x = $_[1]->toString(); Note("knowledge: replacement > $x"); return; }
@@ -22,5 +21,18 @@ DefPrimitive('\knowledge{}{}',
 DefConstructor('\kl[]{}',
   sub { my $x = $_[2]->toString(); Note("kl: replacement > $x"); return; }
 );
+
+# my $x = 0;
+
+# DefPrimitive('\knowledge{}{}',
+#   sub {$x += 1; Note("Value of x is $x"); return;}
+# );
+
+# DefConstructor('\kl[]{}',
+#   "KL: #x",
+#   properties=> sub {
+#     $x += 1; x => $x;
+#   }
+# );
 
 1; 
