@@ -18,17 +18,16 @@ use feature 'state';
 # ---
 # Prefix of knowledge labels used in the xml document
 # ---
-my $prefixLabel = "KL:";
-my $prefixLabelTemp = "KLTEMP:";
-my $dumbLabel = "KLUNIQUE:dumbAPlabel";
+my $prefixLabel = "kl:";
 
 # ---
 # Names of values/mapping used to store information obtained while scanning .tex document
 # ---
-# Hash of all directives
-my $definedDirectives = "KL:definedDirectives";
-# Name of last knowledge that was defined
-my $lastKnowledge = "KL:lastKnowledge";
+my $definedDirectives = "kl:definedDirectives"; # Hash of all directives
+my $lastKnowledge = "kl:lastKnowledge"; # Name of last knowledge that was defined
+my $lastAP = "kl:lastAP"; # Pointer to last AP
+my $lastAPsubstitute = "kl:lastAPsubstitute"; # Pointer to last AP
+my $APindex = "kl:APindex"; # Number of AP
 
 # ---
 # Defines functions to handle all knowledges
@@ -114,135 +113,102 @@ DefPrimitive('\knowledge{}{}',
     return undef;
 });
 
+# Labels of the anchor will be added when constructing \intro.
+DefConstructor('\AP',
+  sub {
+    my $document = $_[0];
+    unless (LookupValue($APindex)) {
+      AssignValue($APindex, 0);
+    }
+    my $APindexValue = LookupValue($APindex);
+    AssignValue($APindex, $APindexValue + 1);
+    $document->openElement("ltx:anchor", class => "klAP", labels => "klAP:" . $APindexValue);
+    AssignValue($lastAP, $document->getNode());
+    $document->closeElement("ltx:anchor");
+  },
+  afterConstruct => sub {
+    my $document = $_[0];
+  }
+);
+
 sub parse_kl_or_intro {
-  my ($stomach, $scope, $kl, $text) = @_;
+  my ($document, $scope, $kl, $text) = @_;
   $kl = ($kl ? $kl->toString() : $text->toString()) . ($scope ? '@' . $scope->toString() : '');
   (kl => $kl, text => $text->toString())
 }
 
 DefConstructor('\kl OptionalBalancedParen []{}',
-    "<ltx:ref class='kl' labelref='$prefixLabelTemp#kl'>#text</ltx:ref>",
-    properties=> sub { parse_kl_or_intro(@_) });
-
-# We add a dumb (temporary) label to the anchor to force LaTeXML
-# to assign it an xml:id. Its final labels will be defined during Rewriting.
-DefConstructor('\AP',
-    "<ltx:anchor class='klAP' labels='$dumbLabel'/>"
+  sub {
+    my $document = $_[0];
+    my %props = parse_kl_or_intro(@_);
+    my $kl = $props{"kl"};
+    my $text = $props{"text"};
+    my %args = ();
+    if (my $rootkl = getRootNotion($kl)) {
+      %args = ("labelref" => $prefixLabel . $rootkl, class => "kl");
+    } elsif (my $url = getUrl($kl)) {
+      %args = ("href" => $url, class => "kl");
+    } else {
+      %args = (class => "klundefined")
+    }
+    $document->openElement("ltx:ref", %args);
+    $document->absorb($text);
+    $document->closeElement("ltx:ref");
+  }
 );
 
-# There was no reasonable element for \intro that supported the attribute labels,
-# so we added this attribute to the anchor element.
-# https://math.nist.gov/~BMiller/LaTeXML/manual/schema/LaTeXML-common/#I1.ix14.I14.ix2.p1
-DefConstructor('\intro OptionalBalancedParen []{}',
-    "<ltx:anchor class='klintro' labels='$prefixLabelTemp#kl'>#text</ltx:anchor>",
-    properties=> sub { parse_kl_or_intro(@_) });
-
-# ---
-# Rewrite temporary labels by using directives definitions
-# ---
-
-sub findLastAnchor {
-  # Returns a hashref that maps any \intro
-  # (or rather its XML representation as an anchor tag of class klintro)
-  # to the lattest preceding occurence of an anchor (in fact, any anchor or section node
-  # with an xml:id attribute: this includes \AP, but also sections).
-  # This is hash is cached.
-  my ($doc) = @_;
-  state $mappingToLastAnchor = {};
-  unless (%$mappingToLastAnchor) {
-    state $lastAnchor = 0;
+sub getLastAP {
+  my ($document) = @_;
+  # If some AP has already been defined, we return it.
+  # Otherwise, we look for the last tag with a `xml:id` attribute.
+  # Typically this should correspond to the parent paragraph.
+  if (my $anchor = LookupValue($lastAP)) {
+    return $anchor;
+  } else {
+    AssignValue($lastAPsubstitute, $document->documentElement());
     sub dfs {
       my ($node) = @_;
-      if (
-        $node->nodeName() eq 'anchor'
-        && $node->hasAttribute('class')
-        && $node->getAttribute('class') eq 'klintro'
-        && $lastAnchor != 0
-      ) {
-        $mappingToLastAnchor->{$node} = $lastAnchor;
-      } elsif (
-        ($node->nodeName() eq 'anchor'
-          || $node->nodeName() eq 'section')
-        && $node->hasAttribute('xml:id')
-      ) {
-        $lastAnchor = $node;
+      if ($node->hasAttribute('labels')) {
+        AssignValue($lastAPsubstitute, $node);
       }
       for my $child ($node->getChildrenByTagName('*')) {
         dfs($child);
       }
     }
-    dfs($doc->documentElement());
-  }
-  return $mappingToLastAnchor;
-}
-
-# Whenever we find an anchor tag created by an \intro
-# (i.e. of class klintro and with label(s)), we:
-# 1. Move the labels to the lattest preceding occurence of 
-#     an \AP (represented by an anchor of class klAP), or sectionning.
-# 2. Change the anchor tag into a `text` tag.
-DefRewrite(
-  xpath => "//ltx:anchor[\@class = 'klintro'][starts-with(\@labels, '$prefixLabelTemp')]",
-  match => sub {
-    my ($doc, $intro) = @_;
-    if ($intro->getAttribute("labels") =~ /^$prefixLabelTemp(.*)$/) {
-      if (isKnowledgeDefined($1)) {
-        my $mappingToLastAnchor = findLastAnchor($doc);
-        # Move labels to the last anchor (any node with an xml:id attribute).
-        if (my $anchor = $mappingToLastAnchor->{$intro}) {
-          my $newLabel = "";
-          if ($anchor->hasAttribute("labels")) {
-            $newLabel .= $anchor->getAttribute("labels") . " ";
-          }
-          $newLabel .= $prefixLabel . getRootNotion($1);
-          $anchor->setAttribute("labels", $newLabel);
-        }
-      }
-      # Create new text tag
-      $intro->setNodeName("text");
-      $intro->removeAttribute("labels");
-      $intro->removeAttribute("xml:id");
-      if (!isKnowledgeDefined($1)) {
-        $intro->setAttribute('class', 'klintroundefined');
-      }
-    }
-  }
-);
-
-DefRewrite(
-  xpath => "//ltx:anchor[\@class = 'klAP']",
-  match => sub {
-    my ($doc, $anchor) = @_;
-    if ($anchor->hasAttribute("labels")) {
-      # If there are no other labels, remove the node.
-      # Otherwise, only remove the temporary label.
-      if ($anchor->getAttribute("labels") eq $dumbLabel) {
-        $anchor->unbindNode();
-        # $anchor->setAttribute("labels", "");
-      } elsif ($anchor->getAttribute("labels") =~ /^$dumbLabel (.*)$/) {
-        $anchor->setAttribute("labels", $1);
-      }
-    }
-  } 
-);
-
-sub rewriteKnowledge {
-  my ($ref, $kl) = @_;
-  if (my $rootkl = getRootNotion($kl)) {
-    $ref->setAttribute("labelref", $prefixLabel . $rootkl);
-  } elsif (my $url = getUrl($kl)) {
-    $ref->removeAttribute("labelref");
-    $ref->setAttribute("href", $url);
+    dfs($document->documentElement());
+    return LookupValue($lastAPsubstitute);
   }
 }
 
-DefRewrite(
-  xpath => "//ltx:ref[\@class = 'kl'][starts-with(\@labelref, '$prefixLabelTemp')]",
-  match => sub {
-    my ($doc, $ref) = @_;
-    if ($ref->getAttribute("labelref") =~ /^$prefixLabelTemp(.*)$/) {
-      rewriteKnowledge($ref, $1);
+# There was no reasonable element for \intro that supported the attribute labels,
+# so we added this attribute to the anchor element.
+# https://math.nist.gov/~BMiller/LaTeXML/manual/schema/LaTeXML-common/#I1.ix14.I14.ix2.p1
+DefConstructor('\intro OptionalBalancedParen []{}',
+  sub {
+    my ($document, $scope, $kl, $text) = @_;
+    my %props = parse_kl_or_intro(@_);
+    my $labelref = $prefixLabel . ($props{"kl"});
+    $text = $props{"text"};
+    my $class;
+    if (isKnowledgeDefined($props{"kl"})) {
+      # Move labels to the last anchor
+      my $anchor = getLastAP($document);
+      # We only append the new label if the anchor has an xml:id
+      # This prevent e.g. adding a labels attribute to a tag that shouldn't have one.
+      if ($anchor->hasAttribute('labels')) {
+        my $newLabel = $anchor->getAttribute("labels") . " ";
+        $newLabel .= $prefixLabel . getRootNotion($props{"kl"});
+        $anchor->setAttribute("labels", $newLabel);
+      } else {
+        Note("Warning (knowledge): intro of knowledge `$props{'kl'}` is ignored, there is no preceeding anchor point (\\AP).");
+      }
+      $class = "klintro";
+    } else {
+      $class = "klintroundefined";
     }
+    $document->openElement("ltx:text", labels => $labelref, class => $class);
+    $document->absorb($text);
+    $document->closeElement("ltx:text");
   }
 );
 
