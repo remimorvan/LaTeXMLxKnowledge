@@ -137,7 +137,41 @@ sub parse_kl_or_intro {
   (kl => $kl, text => $text->toString())
 }
 
-DefConstructor('\kl OptionalBalancedParen []{}',
+# Read a parenthesis delimited argument.
+# This DOES balance () within the argument, contrary to the ill-named `BalancedParen`.
+DefParameterType('TrulyBalancedParen',
+  sub {
+    my ($gullet) = @_;
+    return undef unless $gullet->ifNext(T_OTHER('('));
+    $gullet->readToken();  # consume opening '('
+    my @tokens = ();
+    my $depth = 1;
+    while ($depth > 0) {
+      my $token = $gullet->readToken();
+      if (!defined $token) {
+        Error('expected', ')', $gullet, "Missing closing parenthesis");
+      }
+      if ($token->equals(T_OTHER('('))) {
+        $depth++;
+        push(@tokens, $token);
+      }
+      elsif ($token->equals(T_OTHER(')'))) {
+        $depth--;
+        push(@tokens, $token) if $depth > 0;  # Don't include final ')'
+      }
+      else {
+        push(@tokens, $token);
+      }
+    }
+    return Tokens(@tokens);
+  },
+  reversion => sub {
+    my ($arg) = @_;
+    return ($arg ? (T_OTHER('('), $arg->revert, T_OTHER(')')) : ());
+  }
+);
+
+DefConstructor('\kl OptionalTrulyBalancedParen []{}',
   sub {
     my $document = $_[0];
     my %props = parse_kl_or_intro(@_);
@@ -183,7 +217,7 @@ sub getLastAP {
 # There was no reasonable element for \intro that supported the attribute labels,
 # so we added this attribute to the anchor element.
 # https://math.nist.gov/~BMiller/LaTeXML/manual/schema/LaTeXML-common/#I1.ix14.I14.ix2.p1
-DefConstructor('\intro OptionalBalancedParen []{}',
+DefConstructor('\intro OptionalTrulyBalancedParen []{}',
   sub {
     my ($document, $scope, $kl, $text) = @_;
     my %props = parse_kl_or_intro(@_);
