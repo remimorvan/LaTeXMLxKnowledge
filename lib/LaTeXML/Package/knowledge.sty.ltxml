@@ -171,7 +171,7 @@ DefConstructor('\AP',
 
 sub parse_kl_or_intro {
   my ($document, $scope, $kl, $text) = @_;
-  $kl = ($kl ? $kl->toString() : $text->toString()) . ($scope ? '@' . $scope->toString() : '');
+  $kl = ($kl ? $kl->toString() : $text->toString()) . ($scope && ($scope->toString() ne '') ? '@' . $scope->toString() : '');
   (kl => $kl, text => $text->toString())
 }
 
@@ -250,7 +250,44 @@ DefConstructor('\intro OptionalTrulyBalancedParen []{}',
   }
 );
 
-# Macro for single/double quotes
+# ---
+# Quotation option
+# ---
+
+# Given a knowledge in quotation mode (`text`, `text@kl` or `text@kl@scope`)
+# represented by a sequence of tokens, returns a reference to an array (text, kl, scope), where
+# each element is again a sequence of tokens.
+sub parse_knowledge_quotation {
+  my @inputTokens = @_;
+  my $parsedInput = [[], [], []];
+  my $nbAt = 0;
+  for my $tok (@inputTokens) {
+    if ($tok->toString eq '@' && $nbAt < 2) {
+      $nbAt++;
+    } else {
+		  push @{$parsedInput->[$nbAt]}, $tok;
+    }
+  }
+  return $parsedInput;
+}
+
+# Transforms a sequence of tokens representing `text@kl@scope``
+# into a sequence of tokens representing `(scope)[kl]{text}`.
+# Empty args are ignored, so for instance `text` yields `{text}`
+# rather than `()[]{text}`.
+sub token_sequence_from_quotation_knowledge {
+  my $parsedInput = parse_knowledge_quotation(@_);
+  my @outputTokens = ();
+  my $delims = [[T_OTHER('('), T_OTHER(')')], [T_OTHER('['), T_OTHER(']')], [T_BEGIN(), T_END()]];
+  for my $i (0,1,2) {
+    if (@{$parsedInput->[2-$i]}) {
+      push(@outputTokens, $delims->[$i][0]);
+      push(@outputTokens, @{$parsedInput->[2-$i]});
+      push(@outputTokens, $delims->[$i][1]);
+    }
+  }
+  return @outputTokens;
+}
 
 AssignCatcode('"' => CC_ACTIVE);
 DefMacro('"', sub {
@@ -280,11 +317,14 @@ DefMacro('"', sub {
     Note("Error");
     return ()
   }
+  # my $parsedKl = parse_knowledge_quotation(@readTokens);
+  # print_list_tokens(@readTokens);
+  # print "\tScope: "; print_list_tokens(@{$parsedKl->[2]});
+  # print "\tKl: "; print_list_tokens(@{$parsedKl->[1]});
+  # print "\tText: "; print_list_tokens(@{$parsedKl->[0]});
   return (
     T_CS($in_double_quote ? '\intro' : '\kl'),
-    T_BEGIN,
-    @readTokens,
-    T_END
+    token_sequence_from_quotation_knowledge(@readTokens)
   );
 });
 
