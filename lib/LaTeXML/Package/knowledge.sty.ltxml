@@ -118,11 +118,11 @@ DefParameterType('TrulyBalancedParen',
       if (!defined $token) {
         Error('expected', ')', $gullet, "Missing closing parenthesis");
       }
-      if ($token->equals(T_OTHER('('))) {
+      if ($token->toString() eq '(') {
         $depth++;
         push(@tokens, $token);
       }
-      elsif ($token->equals(T_OTHER(')'))) {
+      elsif ($token->toString() eq ')') {
         $depth--;
         push(@tokens, $token) if $depth > 0;  # Don't include final ')'
       }
@@ -296,24 +296,24 @@ DefMacro('"', sub {
   my $tok = $gullet->readToken();
   # Check next character to check if it is also a quote
   my $in_double_quote = 0;
-  if (ref $tok && $tok->equals(T_ACTIVE('"'))) {
+  if (ref $tok && $tok->toString() eq '"') {
     $in_double_quote = 1;
   } else {
     $gullet->unread($tok);
   }
   while (1) {
     $tok = $gullet->readToken();
-    if (ref $tok && !$tok->equals(T_ACTIVE('"'))) {
+    if (ref $tok && $tok->toString() ne '"') {
       push(@readTokens, $tok);
     } else {
       last;
     }
   }
   # If the sequence started with two doubles quotes, looks for the second double quote. 
-  if (ref $tok && $tok->equals(T_ACTIVE('"')) && $in_double_quote) {
+  if (ref $tok && $tok->toString() eq '"' && $in_double_quote) {
     $tok = $gullet->readToken();
   }
-  unless (ref $tok && $tok->equals(T_ACTIVE('"'))) {
+  unless (ref $tok && $tok->toString() eq '"') {
     Note("Error");
     return ()
   }
