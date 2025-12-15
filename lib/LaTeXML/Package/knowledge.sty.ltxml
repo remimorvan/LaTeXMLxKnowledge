@@ -13,7 +13,7 @@ package LaTeXML::Package::Pool;
 use strict;
 use warnings;
 use LaTeXML::Package;
-use feature 'state';
+use JSON;
 
 # ---
 # Prefix of knowledge labels used in the xml document
@@ -142,12 +142,58 @@ DefParameterType('TrulyBalancedParen',
 # Defines primitives and constructors
 # ---
 
+sub readPipeKl {
+  my ($gullet) = @_;
+  my @tokens = ();
+  my $tok = $gullet->readToken();
+  while (ref $tok && $tok->toString() ne "\n") {
+    push(@tokens, $tok);
+    $tok = $gullet->readToken();
+  }
+  my $klStr = ToString(Tokens(@tokens));
+  $klStr =~ s/^\s+|\s+$//g; # removes leading and trailing whitespaces
+  return $klStr;
+}
+
 # Store the directives in a global dict called $definedDirectives
-DefPrimitive('\knowledge{}{}',
+# DefPrimitive('\knowledge{}{}',
+#   sub {
+#     my ($stomach, $source, $directives) = @_;
+#     AssignMapping($definedDirectives, $source->toString(), breakupDirectives($directives->toString()));
+#     AssignValue($lastKnowledge, $source->toString());
+#     return undef;
+# });
+DefPrimitive('\knowledge{}',
   sub {
-    my ($stomach, $source, $directives) = @_;
-    AssignMapping($definedDirectives, $source->toString(), breakupDirectives($directives->toString()));
-    AssignValue($lastKnowledge, $source->toString());
+    my ($stomach, $arg1) = @_;
+    my $gullet = $stomach->getGullet();
+    $gullet->skipSpaces();
+    if ($gullet->ifNext(T_BEGIN())) {
+      # Syntax: \knowledge{kl}{directives}
+      my $kl = $arg1;
+      my $directives = $gullet->readArg();
+      AssignMapping($definedDirectives, $kl->toString(), breakupDirectives($directives->toString()));
+      AssignValue($lastKnowledge, $kl->toString());
+    } elsif ($gullet->ifNext(T_OTHER("|"))) {
+      # Syntax: \knowledge{directives} \n | kl1 \n | kl2 \n | kl3 \n
+      my $directivesHash = breakupDirectives($arg1->toString());
+      my $firstKl = undef;
+      while ($gullet->ifNext(T_OTHER("|"))) {
+        $gullet->readToken();
+        my $kl = readPipeKl($gullet);
+        Note("\tkl: $kl");
+        if ($firstKl) {
+          $directivesHash = {link => $firstKl};
+        } else {
+          $firstKl = $kl;
+          AssignValue($lastKnowledge, $kl);
+        }
+        AssignMapping($definedDirectives, $kl, $directivesHash);
+        $gullet->skipSpaces();
+      }
+    } else {
+      Error('expected', '{} or |', $stomach, "\\knowledge expects either {directives} or | after first argument.")
+    }
     return undef;
 });
 
