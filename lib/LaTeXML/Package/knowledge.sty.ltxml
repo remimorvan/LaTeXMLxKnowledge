@@ -13,7 +13,6 @@ package LaTeXML::Package::Pool;
 use strict;
 use warnings;
 use LaTeXML::Package;
-use JSON;
 
 # ---
 # Prefix of knowledge labels used in the xml document
@@ -181,7 +180,7 @@ DefPrimitive('\knowledge{}',
       while ($gullet->ifNext(T_OTHER("|"))) {
         $gullet->readToken();
         my $kl = readPipeKl($gullet);
-        Note("\tkl: $kl");
+        # Note("\tkl: $kl");
         if ($firstKl) {
           $directivesHash = {link => $firstKl};
         } else {
@@ -284,7 +283,7 @@ DefConstructor('\intro OptionalTrulyBalancedParen []{}',
         $newLabel .= $prefixLabel . getRootNotion($props{"kl"});
         $anchor->setAttribute("labels", $newLabel);
       } else {
-        Note("Warning (knowledge): intro of knowledge `$props{'kl'}` is ignored, there is no preceeding anchor point (\\AP).");
+        Warn('ignore', $props{'kl'}, $document->getNode(), "Intro of knowledge `$props{'kl'}` is ignored, there is no preceeding anchor point (\\AP).");
       }
       $class = "klintro";
     } else {
