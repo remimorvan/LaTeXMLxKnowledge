@@ -10,6 +10,7 @@
 # | http://dlmf.nist.gov/LaTeXML/                              (o o)    | #
 # \=========================================================ooo==U==ooo=/ #
 package LaTeXML::Package::Pool;
+use List::Util(first);
 use strict;
 use warnings;
 use LaTeXML::Package;
@@ -22,7 +23,7 @@ my $prefixLabel = "kl:";
 # ---
 # Names of values/mapping used to store information obtained while scanning .tex document
 # ---
-my $definedDirectives = "kl:definedDirectives"; # Hash of all directives
+my $definedKnowledges = "kl:definedKnowledges"; # Hash of all knowledges
 my $lastKnowledge = "kl:lastKnowledge"; # Name of last knowledge that was defined
 my $lastAP = "kl:lastAP"; # Pointer to last AP
 my $lastAPsubstitute = "kl:lastAPsubstitute"; # Pointer to last AP
@@ -65,29 +66,36 @@ sub breakupDirectives {
 
 sub isKnowledgeDefined {
   my ($kl) = @_;
-  return defined LookupMapping($definedDirectives, $kl);
+  return defined LookupMapping($definedKnowledges, $kl);
 }
 
 sub getDirective {
   # Checks if the a directive was given for a knowledge.
   # Returns either a boolean or a value (e.g. for `url`).
   my ($kl, $dir) = @_;
-  if (isKnowledgeDefined($kl) && defined LookupMapping($definedDirectives, $kl)->{$dir}) {
-    return LookupMapping($definedDirectives, $kl)->{$dir};
+  if (isKnowledgeDefined($kl) && defined LookupMapping($definedKnowledges, $kl)->{$dir}) {
+    return LookupMapping($definedKnowledges, $kl)->{$dir};
   }
   return 0; 
 }
 
 sub getRootNotion {
-  # Given a knowledge, get its root knowledge, or 0 if it doesn't exist.
+  # Given a knowledge, get its root knowledge (obtain by following the link directive),
+  # or 0 if it doesn't exist.
   my ($kl) = @_;
-  if (getDirective($kl, "notion")) {
-    return $kl;
+  my @visitedKls = ();
+  while (!getDirective($kl, "notion")) {
+    if (first {$_ eq $kl} @visitedKls) {
+      Warn('misdefined', $kl, undef, "Circular knowledge definition for '$kl'.");
+      return 0;
+    }
+    push(@visitedKls, $kl);
+    if (my $parent = getDirective($kl, "link")) {
+      $kl = $parent;
+    } else {
+      return 0;
+    }
   }
-  if (my $parent = getDirective($kl, "link")) {
-    return getRootNotion($parent);
-  }
-  return 0;
 }
 
 sub getUrl {
@@ -154,11 +162,11 @@ sub readPipeKl {
   return $klStr;
 }
 
-# Store the directives in a global dict called $definedDirectives
+# Store the directives in a global dict called $definedKnowledges
 # DefPrimitive('\knowledge{}{}',
 #   sub {
 #     my ($stomach, $source, $directives) = @_;
-#     AssignMapping($definedDirectives, $source->toString(), breakupDirectives($directives->toString()));
+#     AssignMapping($definedKnowledges, $source->toString(), breakupDirectives($directives->toString()));
 #     AssignValue($lastKnowledge, $source->toString());
 #     return undef;
 # });
@@ -171,7 +179,7 @@ DefPrimitive('\knowledge{}',
       # Syntax: \knowledge{kl}{directives}
       my $kl = $arg1;
       my $directives = $gullet->readArg();
-      AssignMapping($definedDirectives, $kl->toString(), breakupDirectives($directives->toString()));
+      AssignMapping($definedKnowledges, $kl->toString(), breakupDirectives($directives->toString()));
       AssignValue($lastKnowledge, $kl->toString());
     } elsif ($gullet->ifNext(T_OTHER("|"))) {
       # Syntax: \knowledge{directives} \n | kl1 \n | kl2 \n | kl3 \n
@@ -187,7 +195,7 @@ DefPrimitive('\knowledge{}',
           $firstKl = $kl;
           AssignValue($lastKnowledge, $kl);
         }
-        AssignMapping($definedDirectives, $kl, $directivesHash);
+        AssignMapping($definedKnowledges, $kl, $directivesHash);
         $gullet->skipSpaces();
       }
     } else {
@@ -227,12 +235,16 @@ DefConstructor('\kl OptionalTrulyBalancedParen []{}',
     my $kl = $props{"kl"};
     my $text = $props{"text"};
     my %args = ();
+    Note("\\kl: $kl");
     if (my $rootkl = getRootNotion($kl)) {
       %args = ("labelref" => $prefixLabel . $rootkl, class => "kl");
+      Note("\tpoint to: $rootkl");
     } elsif (my $url = getUrl($kl)) {
       %args = ("href" => $url, class => "kl");
+      Note("\turl: $url");
     } else {
-      %args = (class => "klundefined")
+      %args = (class => "klundefined");
+      Note("\tundefined");
     }
     $document->openElement("ltx:ref", %args);
     $document->absorb($text);
