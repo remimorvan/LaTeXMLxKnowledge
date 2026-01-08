@@ -28,6 +28,18 @@ my $lastKnowledge = "kl:lastKnowledge"; # Name of last knowledge that was define
 my $lastAP = "kl:lastAP"; # Pointer to last AP
 my $lastAPsubstitute = "kl:lastAPsubstitute"; # Pointer to last AP
 my $APindex = "kl:APindex"; # Number of AP
+my $klOption = "kl:option:";
+
+# ---
+# Handle options
+# ---
+
+DeclareOption('quotation', sub {
+  AssignValue($klOption . "quotation" => 1, 'global');
+  AssignCatcode('"' => CC_ACTIVE);
+});
+
+ProcessOptions();
 
 # ---
 # Defines functions to handle all knowledges
@@ -96,6 +108,7 @@ sub getRootNotion {
       return 0;
     }
   }
+  return $kl;
 }
 
 sub getUrl {
@@ -346,7 +359,6 @@ sub token_sequence_from_quotation_knowledge {
   return @outputTokens;
 }
 
-AssignCatcode('"' => CC_ACTIVE);
 DefMacro('"', sub {
   my ($gullet) = @_;
   my @readTokens = ();
