@@ -314,13 +314,11 @@ for my $cmd ('\part', '\chapter', '\section', '\subsection', '\subsubsection', '
   Let($oldcmd, $cmd);
   DefMacro(($cmd . ' OptionalMatch:* []{}'), sub {
     my ($gullet, $star, $short, $title) = @_;
-    if ($star) {
-      return Tokens(T_CS($oldcmd), T_OTHER('*'), T_BEGIN, T_CS('\AP'), $title->unlist, T_END);
-    }
-    if ($short) {
-      return Tokens(T_CS($oldcmd), T_OTHER('['), $short->unlist, T_OTHER(']'), T_BEGIN, T_CS('\AP'), $title->unlist, T_END);
-    } 
-    return Tokens(T_CS($oldcmd), T_BEGIN, T_CS('\AP'), $title->unlist, T_END);
+    my @tokens = (T_CS($oldcmd));
+    push(@tokens, T_OTHER('*')) if $star;
+    push(@tokens, T_OTHER('['), $short->unlist, T_OTHER(']')) if $short;
+    push(@tokens, T_BEGIN, T_CS('\AP'), $title->unlist, T_END);
+    return @tokens;
   });
 }
 
