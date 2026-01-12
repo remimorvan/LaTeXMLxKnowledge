@@ -325,32 +325,37 @@ for my $cmd ('\part', '\chapter', '\section', '\subsection', '\subsubsection', '
 sub parse_kl_or_intro {
   my ($document, $scope, $kl, $text) = @_;
   $kl = ($kl ? $kl->toString() : $text->toString()) . ($scope && ($scope->toString() ne '') ? '@' . $scope->toString() : '');
-  (kl => $kl, text => $text->toString())
+  # $kl is a string, but $text is of type Tokens
+  (kl => $kl, text => $text)
 }
 
-DefConstructor('\kl OptionalTrulyBalancedParen []{}',
-  sub {
-    my $document = $_[0];
-    my %props = parse_kl_or_intro(@_);
-    my $kl = $props{"kl"};
-    my $text = $props{"text"};
-    my %args = ();
-    OptionalNote("\\kl: $kl");
-    if (my $rootkl = getRootNotion($kl)) {
-      %args = ("labelref" => $prefixLabel . $rootkl, class => "kl");
-      OptionalNote("\tpoint to: $rootkl");
-    } elsif (my $url = getUrl($kl)) {
-      %args = ("href" => $url, class => "kl");
-      OptionalNote("\turl: $url");
-    } else {
-      %args = (class => "klundefined");
-      OptionalNote("\tundefined");
-    }
-    $document->openElement("ltx:ref", %args);
-    $document->absorb($text);
-    $document->closeElement("ltx:ref");
-  }
-);
+# DefConstructor('\kl OptionalTrulyBalancedParen []{}',
+#   sub {
+#     my $document = $_[0];
+#     my %props = parse_kl_or_intro(@_);
+#     my $kl = $props{"kl"};
+#     my $text = $props{"text"};
+#     my %args = ();
+#     OptionalNote("\\kl: $kl");
+#     my $inmath = $document->findnodes('ancestor-or-self::ltx:XMath', $document->getNode) 
+#       || $document->findnodes('ancestor-or-self::ltx:Math', $document->getNode);
+#     OptionalNote("\t" . ($inmath ? 'math mode' : 'text mode'));
+#     if (my $rootkl = getRootNotion($kl)) {
+#       %args = ("labelref" => $prefixLabel . $rootkl, class => "kl");
+#       OptionalNote("\tpoint to: $rootkl");
+#     } elsif (my $url = getUrl($kl)) {
+#       %args = ("href" => $url, class => "kl");
+#       OptionalNote("\turl: $url");
+#     } else {
+#       %args = (class => "klundefined");
+#       OptionalNote("\tundefined");
+#     }
+#     my $nodeName = $inmath ? 'ltx:XMRef' : 'ltx:ref';
+#     $document->openElement($nodeName, %args);
+#     $document->absorb($text);
+#     $document->closeElement($nodeName);
+#   }
+# );
 
 sub getLastAP {
   my ($document) = @_;
@@ -385,7 +390,7 @@ DefConstructor('\intro OptionalTrulyBalancedParen []{}',
     my $labelref = $prefixLabel . ($props{"kl"});
     $text = $props{"text"};
     my $class;
-    OptionalNote("\\intro: $text");
+    OptionalNote("\\intro: " . $text->toString);
     if (isKnowledgeDefined($props{"kl"})) {
       # Move labels to the last anchor
       my $anchor = getLastAP($document);
