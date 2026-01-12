@@ -28,16 +28,90 @@ my $lastKnowledge = "kl:lastKnowledge"; # Name of last knowledge that was define
 my $lastAP = "kl:lastAP"; # Pointer to last AP
 my $lastAPsubstitute = "kl:lastAPsubstitute"; # Pointer to last AP
 my $APindex = "kl:APindex"; # Number of AP
-my $klOption = "kl:option:";
+my $klOption = "kl:option"; # Hash of options
+
+# Note that is displayed only if document has the option "latexmlverbose"
+sub OptionalNote {
+  Note(@_) if LookupMapping($klOption, "latexmlverbose");
+}
 
 # ---
-# Handle options
+# Command \knowledgeconfigure & option handlers
 # ---
 
-DeclareOption('quotation', sub {
-  AssignValue($klOption . "quotation" => 1, 'global');
-  AssignCatcode('"' => CC_ACTIVE);
+sub rememberOption {
+  my ($option, $val) = @_;
+  AssignMapping($klOption, $option, $val, 'global');
+}
+sub getOption {
+  my ($option) = @_;
+  return LookupMapping($klOption, $option)
+}
+my %processConfigure = (
+  "quotation" => sub {AssignCatcode('"' => CC_ACTIVE);},
+  "notion" => sub {},
+  "latexmlverbose" => sub {},
+);
+
+DefPrimitive('\knowledgeconfigure{}',
+  sub {
+    my ($stomach, $arg) = @_;
+    my @options = split(/,/, $arg->toString());
+    for my $option (@options) {
+      $option =~ s/^\s+|\s+$//g; # remove both leading and trailing spaces
+      my $val;
+      if ($option =~ /^(.*)=(.*)$/) {
+        # Options of the form 'option=key' (e.g. 'visible anchor points=false')
+        $1 =~ s/^\s+|\s+$//g;
+        $2 =~ s/^\s+|\s+$//g;
+        ($option, $val) = ($1, $2);
+      } else {
+        # Options of the form 'option' (e.g. 'notion')
+        $val = 1;
+      }
+      if (!$processConfigure{$option}) {
+        Warn("unexpected", $option, $stomach,"Unknown option '$option' for package knowledge."); 
+      }
+      rememberOption($option, $val);
+      $processConfigure{$option}($val);
+    }
+    return undef;
 });
+
+# Writing mode
+
+for my $option ("paper", "electronic", "composition") {
+  DeclareOption($option, sub {
+    AssignValue($klOption . $option => 1, 'global');
+    Info("Todo: option $option");
+  });
+}
+
+# Other packages
+
+for my $package ("hyperref", "xcolor", "cleveref") {
+  DeclareOption($package, sub {
+    RequirePackage($package);
+    AssignValue($klOption . $package => 1, 'global');
+  });
+}
+
+for my $package ("makeidx", "imakeidx") {
+  DeclareOption($package, sub {
+    RequirePackage($package);
+    Info("Todo: option $package");
+    AssignValue($klOption . $package => 1, 'global');
+  });
+}
+
+# Configuration option
+
+for my $option ("quotation", "notion", "latexmlverbose") {
+  DeclareOption($option, sub {
+    rememberOption($option, 1);
+    $processConfigure{$option}();
+  });
+}
 
 ProcessOptions();
 
@@ -201,7 +275,6 @@ DefPrimitive('\knowledge{}',
       while ($gullet->ifNext(T_OTHER("|"))) {
         $gullet->readToken();
         my $kl = readPipeKl($gullet);
-        # Note("\tkl: $kl");
         if ($firstKl) {
           $directivesHash = {link => $firstKl};
         } else {
@@ -248,16 +321,16 @@ DefConstructor('\kl OptionalTrulyBalancedParen []{}',
     my $kl = $props{"kl"};
     my $text = $props{"text"};
     my %args = ();
-    Note("\\kl: $kl");
+    OptionalNote("\\kl: $kl");
     if (my $rootkl = getRootNotion($kl)) {
       %args = ("labelref" => $prefixLabel . $rootkl, class => "kl");
-      Note("\tpoint to: $rootkl");
+      OptionalNote("\tpoint to: $rootkl");
     } elsif (my $url = getUrl($kl)) {
       %args = ("href" => $url, class => "kl");
-      Note("\turl: $url");
+      OptionalNote("\turl: $url");
     } else {
       %args = (class => "klundefined");
-      Note("\tundefined");
+      OptionalNote("\tundefined");
     }
     $document->openElement("ltx:ref", %args);
     $document->absorb($text);
@@ -298,6 +371,7 @@ DefConstructor('\intro OptionalTrulyBalancedParen []{}',
     my $labelref = $prefixLabel . ($props{"kl"});
     $text = $props{"text"};
     my $class;
+    OptionalNote("\\intro: $text");
     if (isKnowledgeDefined($props{"kl"})) {
       # Move labels to the last anchor
       my $anchor = getLastAP($document);
@@ -307,12 +381,14 @@ DefConstructor('\intro OptionalTrulyBalancedParen []{}',
         my $newLabel = $anchor->getAttribute("labels") . " ";
         $newLabel .= $prefixLabel . getRootNotion($props{"kl"});
         $anchor->setAttribute("labels", $newLabel);
+        OptionalNote("\tlabel moved to: " . $anchor->nodeName);
       } else {
         Warn('ignore', $props{'kl'}, $document->getNode(), "Intro of knowledge `$props{'kl'}` is ignored, there is no preceeding anchor point (\\AP).");
       }
       $class = "klintro";
     } else {
       $class = "klintroundefined";
+      OptionalNote("\tundefined");
     }
     $document->openElement("ltx:text", labels => $labelref, class => $class);
     $document->absorb($text);
