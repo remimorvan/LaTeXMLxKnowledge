@@ -308,6 +308,22 @@ DefConstructor('\AP',
   }
 );
 
+# Sectioning commands introduce \AP
+for my $cmd ('\part', '\chapter', '\section', '\subsection', '\subsubsection', '\paragraph', '\subparagraph') {
+  my $oldcmd = $cmd . 'KLold';
+  Let($oldcmd, $cmd);
+  DefMacro(($cmd . ' OptionalMatch:* []{}'), sub {
+    my ($gullet, $star, $short, $title) = @_;
+    if ($star) {
+      return Tokens(T_CS($oldcmd), T_OTHER('*'), T_BEGIN, T_CS('\AP'), $title->unlist, T_END);
+    }
+    if ($short) {
+      return Tokens(T_CS($oldcmd), T_OTHER('['), $short->unlist, T_OTHER(']'), T_BEGIN, T_CS('\AP'), $title->unlist, T_END);
+    } 
+    return Tokens(T_CS($oldcmd), T_BEGIN, T_CS('\AP'), $title->unlist, T_END);
+  });
+}
+
 sub parse_kl_or_intro {
   my ($document, $scope, $kl, $text) = @_;
   $kl = ($kl ? $kl->toString() : $text->toString()) . ($scope && ($scope->toString() ne '') ? '@' . $scope->toString() : '');
