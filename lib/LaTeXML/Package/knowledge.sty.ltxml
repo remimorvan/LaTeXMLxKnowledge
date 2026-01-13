@@ -349,7 +349,6 @@ DefConstructor('\kl OptionalTrulyBalancedParen []{}',
       %args = (class => "klundefined");
       OptionalNote("\tundefined");
     }
-    AssignValue('IN_MATH' => 1) if $inmath;
     $document->openElement('ltx:ref', %args);
     $document->openElement('ltx:Math', mode => 'inline') if $inmath;
     $document->openElement('ltx:XMath') if $inmath;
