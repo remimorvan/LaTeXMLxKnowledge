@@ -340,22 +340,19 @@ DefConstructor('\kl OptionalTrulyBalancedParen []{}',
     OptionalNote("\\kl: $kl");
     OptionalNote("\t" . ($inmath ? 'math mode' : 'text mode'));
     if (my $rootkl = getRootNotion($kl)) {
-      %args = ("labelref" => $prefixLabel . $rootkl, class => "kl");
+      %args = ("labelref" => $prefixLabel . $rootkl, "class" => "kl ltx_href");
       OptionalNote("\tpoint to: $rootkl");
     } elsif (my $url = getUrl($kl)) {
-      %args = ("href" => $url, class => "kl");
+      %args = ("href" => $url, "class" => "kl ltx_href");
       OptionalNote("\turl: $url");
     } else {
-      %args = (class => "klundefined");
+      %args = ("class" => "klundefined");
       OptionalNote("\tundefined");
     }
-    $document->openElement('ltx:ref', %args);
-    $document->openElement('ltx:Math', mode => 'inline') if $inmath;
-    $document->openElement('ltx:XMath') if $inmath;
+    my $nodeName = $inmath ? 'ltx:XMWrap' : 'ltx:ref';
+    $document->openElement($nodeName, %args);
     $document->absorb($text);
-    $document->closeElement('ltx:XMath') if $inmath;
-    $document->closeElement('ltx:Math') if $inmath;
-    $document->closeElement('ltx:ref');
+    $document->closeElement($nodeName);
   },
   properties => sub {
     return (inmath => LookupValue('IN_MATH'));
