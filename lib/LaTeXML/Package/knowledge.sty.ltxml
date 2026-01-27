@@ -329,7 +329,7 @@ sub parse_kl_or_intro {
   (kl => $kl, text => $text)
 }
 
-DefConstructor('\kl OptionalTrulyBalancedParen []{}',
+DefConstructor('\kl OptionalTrulyBalancedParen OptionalUndigested {}',
   sub {
     my ($document, $scope, $kl, $text, %props) = @_;
     my %parsedKl = parse_kl_or_intro($document, $scope, $kl, $text);
@@ -385,35 +385,40 @@ sub getLastAP {
 # There was no reasonable element for \intro that supported the attribute labels,
 # so we added this attribute to the anchor element.
 # https://math.nist.gov/~BMiller/LaTeXML/manual/schema/LaTeXML-common/#I1.ix14.I14.ix2.p1
-DefConstructor('\intro OptionalTrulyBalancedParen []{}',
+DefConstructor('\intro OptionalTrulyBalancedParen OptionalUndigested {}',
   sub {
-    my ($document, $scope, $kl, $text) = @_;
-    my %props = parse_kl_or_intro(@_);
-    my $labelref = $prefixLabel . ($props{"kl"});
-    $text = $props{"text"};
+    my ($document, $scope, $kl, $text, %props) = @_;
+    my %parsedKl = parse_kl_or_intro($document, $scope, $kl, $text);
+    my $inmath = $props{"inmath"};
+    my $labelref = $prefixLabel . ($parsedKl{"kl"});
+    $text = $parsedKl{"text"};
     my $class;
     OptionalNote("\\intro: " . $text->toString);
-    if (isKnowledgeDefined($props{"kl"})) {
+    if (isKnowledgeDefined($parsedKl{"kl"})) {
       # Move labels to the last anchor
       my $anchor = getLastAP($document);
       # We only append the new label if the anchor has an xml:id
       # This prevent e.g. adding a labels attribute to a tag that shouldn't have one.
       if ($anchor->hasAttribute('labels')) {
         my $newLabel = $anchor->getAttribute("labels") . " ";
-        $newLabel .= $prefixLabel . getRootNotion($props{"kl"});
+        $newLabel .= $prefixLabel . getRootNotion($parsedKl{"kl"});
         $anchor->setAttribute("labels", $newLabel);
         OptionalNote("\tlabel moved to: " . $anchor->nodeName);
       } else {
-        Warn('ignore', $props{'kl'}, $document->getNode(), "Intro of knowledge `$props{'kl'}` is ignored, there is no preceeding anchor point (\\AP).");
+        Warn('ignore', $parsedKl{'kl'}, $document->getNode(), "Intro of knowledge `$parsedKl{'kl'}` is ignored, there is no preceeding anchor point (\\AP).");
       }
       $class = "klintro";
     } else {
       $class = "klintroundefined";
       OptionalNote("\tundefined");
     }
-    $document->openElement("ltx:text", labels => $labelref, class => $class);
+    my $nodeName = $inmath ? 'ltx:XMApp' : 'ltx:text';
+    $document->openElement($nodeName, labels => $labelref, class => $class);
     $document->absorb($text);
-    $document->closeElement("ltx:text");
+    $document->closeElement($nodeName);
+  },
+  properties => sub {
+    return (inmath => LookupValue('IN_MATH'));
   }
 );
 
