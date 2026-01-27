@@ -248,6 +248,7 @@ The attributes are a subset of those for \elementref{XMTok}.</a:documentation>
     <ref name="ID.attributes"/>
     <ref name="Colorable.attributes"/>
     <ref name="Backgroundable.attributes"/>
+    <ref name="Refable.attributes"/>
   </define>
   <define name="XMApp_model">
     <a:documentation>Content model for \elementref{XMApp}.</a:documentation>
