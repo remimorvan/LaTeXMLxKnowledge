@@ -29,7 +29,10 @@ my $idLastAP = "kl:lastAP"; # Pointer to last AP
 my $idLastAPsubstitute = "kl:lastAPsubstitute"; # Pointer to last AP
 my $idAPindex = "kl:APindex"; # Number of AP
 my $idKlOption = "kl:option"; # Hash of options
-my $idIntroMode = "kl:introMode"; # Ref to array of strings representing the intro mode (used for \intro* and \reintro*): this affects whether an \kl command is effectively processed as a \kl, an \intro or a \reintro. Possible values are undef, "intro" or "reintro". This is (ref to an) array before we need a stack in case of nested \intro*/\reintro*. ()
+my $idIntroMode = "kl:introMode"; # String representing the intro mode (used for \intro* and \reintro*): this affects whether an \kl command is effectively processed as a \kl, an \intro or a \reintro. Possible values are undef, "intro" or "reintro".
+my $idPassIntroMode = "kl:passIntroMode"; # Bool representing whether the intro mode should be absorbed by the first \kl command, or passed along to the next one. Used by \withkl.
+my $idCmdKl = "kl:cmdkl"; # Tokens storing the first argument of a \withkl command. It will be substituted to any occurrence of \cmdkl inside the second argument of the \withkl command.
+
 
 # Note that is displayed only if document has the option "latexmlverbose"
 sub OptionalNote {
@@ -377,11 +380,16 @@ DefConstructor('\kl OptionalTrulyBalancedParen OptionalUndigested {}',
         OptionalNote("\\intro*\\kl: " . ToString($text));
         introSemantics($document, $kl);
         introDisplay($document, $kl, $text, $inmath);
-        AssignValue($idIntroMode, undef, 'global');
+        if (LookupValue($idPassIntroMode)) {
+          AssignValue($idIntroMode, 'reintro', 'global');
+        } else {
+          AssignValue($idIntroMode, undef, 'global');
+        }
+        
       } elsif ($introMode eq 'reintro') {
         OptionalNote("\\reintro*\\kl: " . ToString($text));
         introDisplay($document, $kl, $text, $inmath);
-        AssignValue($idIntroMode, undef, 'global');
+        AssignValue($idIntroMode, undef, 'global') unless LookupValue($idPassIntroMode);
       } else {
         Warn('unexpected', 'introMode', $document->getNode(), "Internal error: unexpected introMode `$introMode`");
       }
@@ -459,15 +467,13 @@ sub introSemantics {
 # There was no reasonable element for \intro that supported the attribute labels,
 # so we added this attribute to the anchor element.
 # https://math.nist.gov/~BMiller/LaTeXML/manual/schema/LaTeXML-common/#I1.ix14.I14.ix2.p1
-DefConstructor('\intro OptionalMatch:* OptionalTrulyBalancedParen OptionalUndigested {}',
+DefConstructor('\intro OptionalTrulyBalancedParen OptionalUndigested {}',
   sub {
-    my ($document, $star, $scope, $kl, $text, %props) = @_;
+    my ($document, $scope, $kl, $text, %props) = @_;
     my %parsedKl = parse_kl_or_intro($document, $scope, $kl, $text);
     my $inmath = $props{"inmath"};
-    if ($star) {
-      OptionalNote("\\intro*: " . ToString($parsedKl{"text"}));
+    if (ToString($parsedKl{"text"}) eq '*') {
       AssignValue($idIntroMode, 'intro', 'global');
-      $document->absorb($text); 
     } else {
       OptionalNote("\\intro: " . ToString($parsedKl{"text"}));
       introSemantics($document, $parsedKl{"kl"});
@@ -480,15 +486,13 @@ DefConstructor('\intro OptionalMatch:* OptionalTrulyBalancedParen OptionalUndige
 );
 
 # \reintro works like \intro except that it is only display.
-DefConstructor('\reintro OptionalMatch:* OptionalTrulyBalancedParen OptionalUndigested {}',
+DefConstructor('\reintro OptionalTrulyBalancedParen OptionalUndigested {}',
   sub {
-    my ($document, $star, $scope, $kl, $text, %props) = @_;
+    my ($document, $scope, $kl, $text, %props) = @_;
     my %parsedKl = parse_kl_or_intro($document, $scope, $kl, $text);
     my $inmath = $props{"inmath"};
-    if ($star) {
-      OptionalNote("\\reintro*: " . ToString($parsedKl{"text"}));
+    if (ToString($parsedKl{"text"}) eq '*') {
       AssignValue($idIntroMode, 'reintro', 'global');
-      $document->absorb($text);
     } else {
       OptionalNote("\\reintro: " . ToString($parsedKl{"text"}));
       introDisplay($document, $parsedKl{"kl"}, $parsedKl{"text"}, $inmath);
@@ -586,6 +590,34 @@ DefMacro('"', sub {
     T_CS($in_double_quote ? '\intro' : '\kl'),
     token_sequence_from_quotation_knowledge(@readTokens)
   );
+});
+
+# ---
+# Math-related commands
+# ---
+
+# \withkl{#1}{#2} produces '\klLTXMLPassIntroMode #2 \klLTXMLAbsorbIntroMode'
+# where every occurrence of \cmdkl in #2 is replaced by #1.
+# This is done by storing #1 in the global register idCmdKl.
+DefMacro('\withkl {} {}', sub {
+  my ($gullet, $klLikeCmd, $arg) = @_;
+  AssignValue($idCmdKl, $klLikeCmd, 'global');
+  return Tokens(T_CS('\klLTXMLPassIntroMode'), $arg->unlist(), T_CS('\klLTXMLAbsorbIntroMode'));
+});
+
+DefMacro('\cmdkl {}', sub {
+  my ($gullet, $arg) = @_;
+  my $res = Tokens(LookupValue($idCmdKl), T_BEGIN, $arg->unlist(), T_END);
+  return $res;
+});
+
+DefConstructor('\klLTXMLPassIntroMode', sub {
+  AssignValue($idPassIntroMode, 1, 'global');
+});
+
+DefConstructor('\klLTXMLAbsorbIntroMode', sub {
+  AssignValue($idPassIntroMode, 0, 'global');
+  AssignValue($idIntroMode, undef, 'global');
 });
 
 1; 
