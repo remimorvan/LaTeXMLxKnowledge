@@ -86,7 +86,7 @@ DefPrimitive('\knowledgeconfigure{}',
 
 for my $option ("paper", "electronic", "composition") {
   DeclareOption($option, sub {
-    AssignValue($idKlOption . $option => 1, 'global');
+    rememberOption($option, 1);
     Info("Todo: option $option");
   });
 }
@@ -96,15 +96,15 @@ for my $option ("paper", "electronic", "composition") {
 for my $package ("hyperref", "xcolor", "cleveref") {
   DeclareOption($package, sub {
     RequirePackage($package);
-    AssignValue($idKlOption . $package => 1, 'global');
+    rememberOption($package, 1);
   });
 }
 
 for my $package ("makeidx", "imakeidx") {
   DeclareOption($package, sub {
     RequirePackage($package);
+    rememberOption($package, 1);
     Info("Todo: option $package");
-    AssignValue($idKlOption . $package => 1, 'global');
   });
 }
 
