@@ -377,7 +377,7 @@ DefConstructor('\kl OptionalTrulyBalancedParen OptionalUndigested {}',
     my $inmath = $props{"inmath"};
     if (my $introMode = LookupValue($idIntroMode)) {
       if ($introMode eq 'intro') {
-        OptionalNote("\\intro*\\kl: " . ToString($text));
+        OptionalNote('\intro*\kl: ' . ToString($text));
         introSemantics($document, $kl);
         introDisplay($document, $kl, $text, $inmath);
         if (LookupValue($idPassIntroMode)) {
@@ -387,7 +387,7 @@ DefConstructor('\kl OptionalTrulyBalancedParen OptionalUndigested {}',
         }
         
       } elsif ($introMode eq 'reintro') {
-        OptionalNote("\\reintro*\\kl: " . ToString($text));
+        OptionalNote('\reintro*\kl: ' . ToString($text));
         introDisplay($document, $kl, $text, $inmath);
         AssignValue($idIntroMode, undef, 'global') unless LookupValue($idPassIntroMode);
       } else {
@@ -609,6 +609,12 @@ DefMacro('\cmdkl {}', sub {
   my ($gullet, $arg) = @_;
   my $res = Tokens(LookupValue($idCmdKl), T_BEGIN, $arg->unlist(), T_END);
   return $res;
+});
+
+DefMacro('\rekl {}', sub {
+  my ($gullet, $arg) = @_;
+  Warn('ignore', '\rekl', $gullet, '\rekl is not supported in LaTeXML.');
+  return $arg->toString() eq "*" ? () : $arg;
 });
 
 DefConstructor('\klLTXMLPassIntroMode', sub {
