@@ -387,7 +387,6 @@ DefConstructor('\kl OptionalTrulyBalancedParen OptionalUndigested {}',
         } else {
           AssignValue($idIntroMode, undef, 'global');
         }
-        
       } elsif ($introMode eq 'reintro') {
         OptionalNote('\reintro*\kl: ' . ToString($text));
         introDisplay($document, $kl, $text, $inmath);
@@ -398,10 +397,14 @@ DefConstructor('\kl OptionalTrulyBalancedParen OptionalUndigested {}',
     } else {
       klDisplay($document, $kl, $text, $inmath);
     }
-    
   },
   properties => sub {
     return (inmath => LookupValue('IN_MATH'));
+  },
+  beforeDigest => sub {
+    # Weirdly needed to ensure that spaces following a \kl are not eaten.
+    $_[0]->enterHorizontal unless LookupValue('IN_MATH');
+    return;
   }
 );
 
@@ -484,6 +487,11 @@ DefConstructor('\intro OptionalTrulyBalancedParen OptionalUndigested {}',
   },
   properties => sub {
     return (inmath => LookupValue('IN_MATH'));
+  },
+  beforeDigest => sub {
+    # Weirdly needed to ensure that spaces following a \kl are not eaten.
+    $_[0]->enterHorizontal unless LookupValue('IN_MATH');
+    return;
   }
 );
 
@@ -502,6 +510,11 @@ DefConstructor('\reintro OptionalTrulyBalancedParen OptionalUndigested {}',
   },
   properties => sub {
     return (inmath => LookupValue('IN_MATH'));
+  },
+  beforeDigest => sub {
+    # Weirdly needed to ensure that spaces following a \kl are not eaten.
+    $_[0]->enterHorizontal unless LookupValue('IN_MATH');
+    return;
   }
 );
 
