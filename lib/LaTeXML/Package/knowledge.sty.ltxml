@@ -305,6 +305,8 @@ DefPrimitive('\knowledge{}',
     return undef;
 });
 
+DefMacro('\itemAP', '\item\AP');
+
 # Labels of the anchor will be added when constructing \intro.
 DefConstructor('\AP',
   sub {
