@@ -265,24 +265,21 @@ sub readPipeKl {
 }
 
 # Store the directives in a global dict called $idDefinedKnowledges
-# DefPrimitive('\knowledge{}{}',
-#   sub {
-#     my ($stomach, $source, $directives) = @_;
-#     AssignMapping($idDefinedKnowledges, $source->toString(), breakupDirectives($directives->toString()));
-#     AssignValue($idLastKnowledge, $source->toString());
-#     return undef;
-# });
 DefPrimitive('\knowledge{}',
   sub {
     my ($stomach, $arg1) = @_;
     my $gullet = $stomach->getGullet();
     $gullet->skipSpaces();
-    if ($gullet->ifNext(T_BEGIN())) {
-      # Syntax: \knowledge{kl}{directives}
-      my $kl = $arg1;
-      my $directives = $gullet->readArg();
-      AssignMapping($idDefinedKnowledges, $kl->toString(), breakupDirectives($directives->toString()));
-      AssignValue($idLastKnowledge, $kl->toString(), 'global');
+    if ($gullet->ifNext(T_BEGIN()) || $gullet->ifNext(T_OTHER('['))) {
+      # Syntax: \knowledge{kl}[synonym 1| synonym 2|...]{directives}
+      my $kl = $arg1->toString();
+      my $synonyms = $gullet->readOptional()->toString();
+      my $directives = $gullet->readArg()->toString();
+      AssignMapping($idDefinedKnowledges, $kl, breakupDirectives($directives));
+      AssignValue($idLastKnowledge, $kl, 'global');
+      for my $synonym (split(/\|/, $synonyms)) {
+        AssignMapping($idDefinedKnowledges, $synonym, {link => $kl});
+      }
     } elsif ($gullet->ifNext(T_OTHER("|"))) {
       # Syntax: \knowledge{directives} \n | kl1 \n | kl2 \n | kl3 \n
       my $directivesHash = breakupDirectives($arg1->toString());
