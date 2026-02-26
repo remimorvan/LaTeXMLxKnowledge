@@ -273,12 +273,14 @@ DefPrimitive('\knowledge{}',
     if ($gullet->ifNext(T_BEGIN()) || $gullet->ifNext(T_OTHER('['))) {
       # Syntax: \knowledge{kl}[synonym 1| synonym 2|...]{directives}
       my $kl = $arg1->toString();
-      my $synonyms = $gullet->readOptional()->toString();
+      my $synonyms = $gullet->readOptional();
       my $directives = $gullet->readArg()->toString();
       AssignMapping($idDefinedKnowledges, $kl, breakupDirectives($directives));
       AssignValue($idLastKnowledge, $kl, 'global');
-      for my $synonym (split(/\|/, $synonyms)) {
-        AssignMapping($idDefinedKnowledges, $synonym, {link => $kl});
+      if ($synonyms) {
+        for my $synonym (split(/\|/, $synonyms->toString())) {
+          AssignMapping($idDefinedKnowledges, $synonym, {link => $kl});
+        }
       }
     } elsif ($gullet->ifNext(T_OTHER("|"))) {
       # Syntax: \knowledge{directives} \n | kl1 \n | kl2 \n | kl3 \n
