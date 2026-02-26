@@ -645,5 +645,7 @@ DefConstructor('\klLTXMLAbsorbIntroMode', sub {
 });
 
 DefMacro('\knowledgenewrobustcmd{}{}', '\newrobustcmd{#1}{\withkl{\kl[#1]}{#2}} \knowledge{#1}{notion}');
+DefMacro('\knowledgenewcommand{}{}', '\newcommand{#1}{\withkl{\kl[#1]}{#2}} \knowledge{#1}{notion}');
+DefMacro('\knowledgerenewcommand{}{}', '\renewcommand{#1}{\withkl{\kl[#1]}{#2}} \knowledge{#1}{notion}');
 
 1; 
