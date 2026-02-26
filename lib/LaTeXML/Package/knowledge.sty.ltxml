@@ -99,6 +99,7 @@ for my $package ("hyperref", "xcolor", "cleveref") {
     rememberOption($package, 1);
   });
 }
+RequirePackage('etoolbox'); # \newrobustcmd
 
 for my $package ("makeidx", "imakeidx") {
   DeclareOption($package, sub {
@@ -340,9 +341,12 @@ for my $cmd ('\part', '\chapter', '\section', '\subsection', '\subsubsection', '
 
 sub parse_kl_or_intro {
   my ($document, $scope, $kl, $text) = @_;
+  my $star = $text && (ord($text->toString()) == 42 || ord($text->toString()) == 0x2217);
+  # 42 handles represents `*` character in text mode,
+  # and 0x2217 represents the same character in math mode.
   $kl = ($kl ? $kl->toString() : $text->toString()) . ($scope && ($scope->toString() ne '') ? '@' . $scope->toString() : '');
   # $kl is a string, but $text is of type Tokens
-  (kl => $kl, text => $text)
+  (star => $star, kl => $kl, text => $text)
 }
 
 # Function called when parsing \kl to display a knowledge.
@@ -436,7 +440,7 @@ sub introDisplay {
   my ($document, $kl, $text, $inmath) = @_;
   my $labelref = $prefixLabel . $kl;
   my $class = isKnowledgeDefined($kl) ? "klintro" : "klintrounknown";
-  my $nodeName = $inmath ? 'ltx:XMApp' : 'ltx:text';
+  my $nodeName = $inmath ? 'ltx:XMWrap' : 'ltx:text';
   $document->openElement($nodeName, labels => $labelref, class => $class);
   $document->absorb($text);
   $document->closeElement($nodeName);
@@ -476,7 +480,7 @@ DefConstructor('\intro OptionalTrulyBalancedParen OptionalUndigested {}',
     my ($document, $scope, $kl, $text, %props) = @_;
     my %parsedKl = parse_kl_or_intro($document, $scope, $kl, $text);
     my $inmath = $props{"inmath"};
-    if (ToString($parsedKl{"text"}) eq '*') {
+    if ($parsedKl{"star"}) {
       AssignValue($idIntroMode, 'intro', 'global');
     } else {
       OptionalNote("\\intro: " . ToString($parsedKl{"text"}));
@@ -639,5 +643,7 @@ DefConstructor('\klLTXMLAbsorbIntroMode', sub {
   AssignValue($idPassIntroMode, 0, 'global');
   AssignValue($idIntroMode, undef, 'global');
 });
+
+DefMacro('\knowledgenewrobustcmd{}{}', '\newrobustcmd{#1}{\withkl{\kl[#1]}{#2}} \knowledge{#1}{notion}');
 
 1; 
